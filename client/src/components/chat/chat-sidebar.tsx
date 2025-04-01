@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getConversations, createConversation } from "@/lib/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getConversations, createConversation, deleteConversation } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Search, Plus, X } from "lucide-react";
+import { Loader2, Search, Plus, X, MoreVertical, Trash, Share, Edit, Download } from "lucide-react";
 import { Conversation } from "@/types";
 import { LanguageSelector } from "@/components/ui/language-selector";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 
 interface ChatSidebarProps {
   isOpen?: boolean;
@@ -32,6 +39,55 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
     queryFn: getConversations,
     enabled: !!user
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (conversationId: number) => deleteConversation(conversationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      toast({
+        title: "Conversation deleted",
+        description: "The conversation has been successfully deleted",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting conversation",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDeleteConversation = (e: React.MouseEvent, conversationId: number) => {
+    e.preventDefault(); // Prevent navigation to conversation
+    e.stopPropagation(); // Prevent event bubbling
+    
+    deleteMutation.mutate(conversationId);
+  };
+
+  const handleShareConversation = (e: React.MouseEvent, conversationId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Copy the conversation URL to clipboard
+    const url = `${window.location.origin}/chat/${conversationId}`;
+    navigator.clipboard.writeText(url);
+    
+    toast({
+      title: "Link copied",
+      description: "Conversation link copied to clipboard",
+    });
+  };
+
+  const handleExportConversation = (e: React.MouseEvent, conversationId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    toast({
+      title: "Coming soon",
+      description: "Export functionality will be available in a future update",
+    });
+  };
 
   const handleCreateConversation = async () => {
     if (!newChatTitle.trim()) {
@@ -185,33 +241,75 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
             </div>
           ) : (
             filteredConversations.map(conversation => (
-              <Link key={conversation.id} href={`/chat/${conversation.id}`}>
-                <div 
-                  className={`p-2 rounded-lg mb-1 cursor-pointer transition-colors
-                    ${location === `/chat/${conversation.id}` 
-                      ? 'bg-primary bg-opacity-10' 
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                >
-                  <div className="flex items-center">
-                    {getLanguageIcon(conversation.language)}
-                    <div className="ml-3 flex-1">
-                      <div className="flex justify-between">
-                        <h4 className={`font-medium ${location === `/chat/${conversation.id}` ? 'text-primary' : ''}`}>
-                          {conversation.title}
-                        </h4>
-                        <span className="text-xs text-gray-500">
-                          {formatTimeAgo(conversation.updatedAt)}
-                        </span>
+              <div key={conversation.id} className="relative group">
+                <Link href={`/chat/${conversation.id}`}>
+                  <div 
+                    className={`p-2 rounded-lg mb-1 cursor-pointer transition-colors group-hover:pr-10
+                      ${location === `/chat/${conversation.id}` 
+                        ? 'bg-primary bg-opacity-10' 
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  >
+                    <div className="flex items-center">
+                      {getLanguageIcon(conversation.language)}
+                      <div className="ml-3 flex-1">
+                        <div className="flex justify-between">
+                          <h4 className={`font-medium ${location === `/chat/${conversation.id}` ? 'text-primary' : ''}`}>
+                            {conversation.title}
+                          </h4>
+                          <span className="text-xs text-gray-500">
+                            {formatTimeAgo(conversation.updatedAt)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                          {conversation.language === 'mas' ? 'Maasai' :
+                           conversation.language === 'swa' ? 'Kiswahili' :
+                           conversation.language === 'kik' ? 'Kikuyu' : conversation.language}
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                        {conversation.language === 'mas' ? 'Maasai' :
-                         conversation.language === 'swa' ? 'Kiswahili' :
-                         conversation.language === 'kik' ? 'Kikuyu' : conversation.language}
-                      </p>
                     </div>
                   </div>
+                </Link>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem 
+                        className="cursor-pointer flex items-center"
+                        onClick={(e) => handleShareConversation(e, conversation.id)}
+                      >
+                        <Share className="mr-2 h-4 w-4" />
+                        <span>Share</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="cursor-pointer flex items-center"
+                        onClick={(e) => handleExportConversation(e, conversation.id)}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Export</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        className="cursor-pointer text-red-500 flex items-center"
+                        onClick={(e) => handleDeleteConversation(e, conversation.id)}
+                      >
+                        <Trash className="mr-2 h-4 w-4" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              </Link>
+              </div>
             ))
           )}
         </div>

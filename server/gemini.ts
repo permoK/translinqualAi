@@ -13,7 +13,7 @@ export async function translateWithGemini(
   targetLanguage: string
 ): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
     // Create a prompt for translation
     const prompt = `
@@ -49,7 +49,7 @@ export async function getLanguageInsights(
   pronunciation: string;
 }> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
     // Create a prompt for language insights
     const prompt = `
@@ -104,7 +104,7 @@ export async function generateResponse(
   language: string
 ): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
     // Determine language name based on code
     const languageName = 
