@@ -37,6 +37,7 @@ export interface Message {
   createdAt: string;
   fileUrl?: string | null;
   audioUrl?: string | null;
+  insights?: LinguisticInsights; // Added for linguistic insights
 }
 
 export interface Language {
@@ -92,10 +93,30 @@ export interface UserProfile {
   preferredLanguage?: string;
 }
 
+export interface LinguisticInsights {
+  culturalContext: string;
+  keyPhrases: string[];
+  pronunciation: string;
+}
+
+export interface TranslationResult {
+  originalText: string;
+  translatedText: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
 export interface WebSocketMessage {
-  type: "message" | "error" | "typing" | "connected";
+  type: "message" | "error" | "typing" | "connected" | "translation" | "insights";
   message?: Message;
   error?: string;
   userId?: number;
   conversationId?: number;
+  action?: string;
+  originalText?: string;
+  translatedText?: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  text?: string;
+  insights?: LinguisticInsights;
 }

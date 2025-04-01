@@ -2,7 +2,7 @@ import express, { Express } from "express";
 import { WebSocketServer } from "ws";
 import { Server } from "http";
 import { storage } from "./storage";
-import { sendAiResponse } from "./ai";
+import { sendAiResponse, translateText, getLinguisticInsights } from "./ai";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -62,6 +62,12 @@ export function setupChatRoutes(app: Express, server: Server) {
           // Handle chat message
           const { conversationId, content, userId, language } = data;
           
+          // Let the client know we're processing
+          ws.send(JSON.stringify({
+            type: "typing",
+            conversationId
+          }));
+          
           // Store user message
           const userMessage = await storage.createMessage({
             conversationId,
@@ -81,20 +87,106 @@ export function setupChatRoutes(app: Express, server: Server) {
           // Generate AI response
           const aiResponse = await sendAiResponse(content, language);
           
+          // Get translation if needed (for non-English responses)
+          let translation = null;
+          if (language !== "eng") {
+            try {
+              // Only translate if the response contains text in the target language
+              // This is a simplistic check; a real implementation would use language detection
+              if (aiResponse.length > 50) { // Assuming longer responses have both languages
+                // Try to extract the translated part using a pattern
+                const languageName = 
+                  language === "mas" ? "Maasai" :
+                  language === "swa" ? "Kiswahili" :
+                  language === "kik" ? "Kikuyu" : null;
+                
+                if (languageName) {
+                  // This is just a simple approach - in a production app, you'd want 
+                  // more sophisticated parsing or have the AI return structured data
+                  translation = await translateText(aiResponse, languageName, "English");
+                }
+              }
+            } catch (translationError) {
+              console.error("Translation error:", translationError);
+              // Continue without translation if it fails
+            }
+          }
+          
+          // Get linguistic insights
+          let insights = null;
+          try {
+            if (language !== "eng") {
+              const languageName = 
+                language === "mas" ? "Maasai" :
+                language === "swa" ? "Kiswahili" :
+                language === "kik" ? "Kikuyu" : "English";
+              
+              insights = await getLinguisticInsights(aiResponse, languageName);
+            }
+          } catch (insightsError) {
+            console.error("Insights error:", insightsError);
+            // Continue without insights if it fails
+          }
+          
           // Store AI response
           const aiMessage = await storage.createMessage({
             conversationId,
             content: aiResponse,
             isUserMessage: false,
-            translation: null,
+            translation, // May be null if no translation
             fileUrl: null,
             audioUrl: null
           });
           
+          // Add insights to the message if available
+          const messageWithInsights = insights ? { ...aiMessage, insights } : aiMessage;
+          
           // Send AI response back to client
           ws.send(JSON.stringify({
             type: "message",
-            message: aiMessage
+            message: messageWithInsights
+          }));
+        }
+        else if (data.type === "translate") {
+          // Handle translation request
+          const { text, sourceLanguage, targetLanguage } = data;
+          
+          // Let the client know we're processing
+          ws.send(JSON.stringify({
+            type: "typing",
+            action: "translating"
+          }));
+          
+          // Perform translation
+          const translatedText = await translateText(text, sourceLanguage, targetLanguage);
+          
+          // Send translation back to client
+          ws.send(JSON.stringify({
+            type: "translation",
+            originalText: text,
+            translatedText,
+            sourceLanguage,
+            targetLanguage
+          }));
+        }
+        else if (data.type === "insights") {
+          // Handle linguistic insights request
+          const { text, language } = data;
+          
+          // Let the client know we're processing
+          ws.send(JSON.stringify({
+            type: "typing",
+            action: "analyzing"
+          }));
+          
+          // Get linguistic insights
+          const insights = await getLinguisticInsights(text, language);
+          
+          // Send insights back to client
+          ws.send(JSON.stringify({
+            type: "insights",
+            text,
+            insights
           }));
         }
       } catch (error) {
@@ -255,6 +347,42 @@ export function setupChatRoutes(app: Express, server: Server) {
       res.json(languages);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch languages", error: error.message });
+    }
+  });
+
+  // Translation API
+  app.post("/api/translate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const { text, sourceLanguage, targetLanguage } = req.body;
+      
+      if (!text || !sourceLanguage || !targetLanguage) {
+        return res.status(400).json({ message: "Text, sourceLanguage, and targetLanguage are required" });
+      }
+      
+      const translatedText = await translateText(text, sourceLanguage, targetLanguage);
+      res.json({ originalText: text, translatedText });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to translate text", error: (error as Error).message });
+    }
+  });
+
+  // Linguistic Insights API
+  app.post("/api/linguistic-insights", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const { text, language } = req.body;
+      
+      if (!text || !language) {
+        return res.status(400).json({ message: "Text and language are required" });
+      }
+      
+      const insights = await getLinguisticInsights(text, language);
+      res.json({ text, insights });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get linguistic insights", error: (error as Error).message });
     }
   });
 }

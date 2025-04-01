@@ -1,4 +1,4 @@
-import { Message, WebSocketMessage } from "@/types";
+import { Message, WebSocketMessage, TranslationResult, LinguisticInsights } from "@/types";
 
 let socket: WebSocket | null = null;
 let reconnectAttempts = 0;
@@ -7,6 +7,9 @@ const RECONNECT_DELAY = 2000; // 2 seconds
 
 // Event handlers
 const messageListeners: ((message: Message) => void)[] = [];
+const typingListeners: ((status: { conversationId?: number; action?: string }) => void)[] = [];
+const translationListeners: ((result: TranslationResult) => void)[] = [];
+const insightsListeners: ((result: { text: string; insights: LinguisticInsights }) => void)[] = [];
 const connectionListeners: ((connected: boolean) => void)[] = [];
 const errorListeners: ((error: string) => void)[] = [];
 
@@ -35,6 +38,26 @@ export function connectWebSocket(): WebSocket {
           if (data.message) {
             messageListeners.forEach(listener => listener(data.message!));
           }
+          break;
+        case "typing":
+          typingListeners.forEach(listener => listener({
+            conversationId: data.conversationId,
+            action: data.action
+          }));
+          break;
+        case "translation":
+          translationListeners.forEach(listener => listener({
+            originalText: data.originalText!,
+            translatedText: data.translatedText!,
+            sourceLanguage: data.sourceLanguage!,
+            targetLanguage: data.targetLanguage!
+          }));
+          break;
+        case "insights":
+          insightsListeners.forEach(listener => listener({
+            text: data.text!,
+            insights: data.insights!
+          }));
           break;
         case "error":
           if (data.error) {
@@ -137,4 +160,71 @@ export function addErrorListener(listener: (error: string) => void) {
       errorListeners.splice(index, 1);
     }
   };
+}
+
+export function addTypingListener(listener: (status: { conversationId?: number; action?: string }) => void) {
+  typingListeners.push(listener);
+  return () => {
+    const index = typingListeners.indexOf(listener);
+    if (index !== -1) {
+      typingListeners.splice(index, 1);
+    }
+  };
+}
+
+export function addTranslationListener(listener: (result: TranslationResult) => void) {
+  translationListeners.push(listener);
+  return () => {
+    const index = translationListeners.indexOf(listener);
+    if (index !== -1) {
+      translationListeners.splice(index, 1);
+    }
+  };
+}
+
+export function addInsightsListener(listener: (result: { text: string; insights: LinguisticInsights }) => void) {
+  insightsListeners.push(listener);
+  return () => {
+    const index = insightsListeners.indexOf(listener);
+    if (index !== -1) {
+      insightsListeners.splice(index, 1);
+    }
+  };
+}
+
+export function requestTranslation(text: string, sourceLanguage: string, targetLanguage: string) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    const newSocket = connectWebSocket();
+    newSocket.addEventListener("open", () => {
+      requestTranslation(text, sourceLanguage, targetLanguage);
+    });
+    return;
+  }
+  
+  const request = {
+    type: "translate",
+    text,
+    sourceLanguage,
+    targetLanguage
+  };
+  
+  socket.send(JSON.stringify(request));
+}
+
+export function requestLinguisticInsights(text: string, language: string) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    const newSocket = connectWebSocket();
+    newSocket.addEventListener("open", () => {
+      requestLinguisticInsights(text, language);
+    });
+    return;
+  }
+  
+  const request = {
+    type: "insights",
+    text,
+    language
+  };
+  
+  socket.send(JSON.stringify(request));
 }

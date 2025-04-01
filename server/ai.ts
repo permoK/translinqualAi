@@ -1,7 +1,7 @@
 import { storage } from "./storage";
+import { generateResponse, translateWithGemini, getLanguageInsights } from "./gemini";
 
-// This function simulates AI response generation
-// In a production environment, you would integrate with the Google Gemini API or other AI services
+// This function generates AI responses and integrates with Gemini
 export async function sendAiResponse(message: string, language: string): Promise<string> {
   try {
     // Get API key from storage
@@ -13,13 +13,65 @@ export async function sendAiResponse(message: string, language: string): Promise
       return getFallbackResponse(message, language);
     }
     
-    // Attempt to use Google Gemini API for responses
-    // For production, you would implement the actual API call here
-    return getFallbackResponse(message, language);
+    // Use Gemini API for generating responses
+    const response = await generateResponse(message, language);
+    return response;
     
   } catch (error) {
     console.error("Error generating AI response:", error);
     return "I'm sorry, I'm having trouble processing your request right now. Please try again later.";
+  }
+}
+
+// Function to translate text between languages
+export async function translateText(text: string, sourceLanguage: string, targetLanguage: string): Promise<string> {
+  try {
+    // Get API key from storage
+    const apiKey = await storage.getApiKeyByProvider("gemini");
+    const actualApiKey = process.env.GEMINI_API_KEY || (apiKey?.keyValue || "");
+    
+    if (!actualApiKey) {
+      console.warn("No API key found for Gemini. Using fallback for translation.");
+      return `[Translation not available: ${text}]`;
+    }
+    
+    // Use Gemini API for translation
+    const translatedText = await translateWithGemini(text, sourceLanguage, targetLanguage);
+    return translatedText;
+    
+  } catch (error) {
+    console.error("Error translating text:", error);
+    return `[Translation error: ${error.message}]`;
+  }
+}
+
+// Function to get language insights and cultural context
+export async function getLinguisticInsights(text: string, language: string): Promise<any> {
+  try {
+    // Get API key from storage
+    const apiKey = await storage.getApiKeyByProvider("gemini");
+    const actualApiKey = process.env.GEMINI_API_KEY || (apiKey?.keyValue || "");
+    
+    if (!actualApiKey) {
+      console.warn("No API key found for Gemini. Using fallback for insights.");
+      return {
+        culturalContext: "Cultural context information not available.",
+        keyPhrases: [],
+        pronunciation: "Pronunciation guide not available."
+      };
+    }
+    
+    // Use Gemini API for linguistic insights
+    const insights = await getLanguageInsights(text, language);
+    return insights;
+    
+  } catch (error) {
+    console.error("Error getting linguistic insights:", error);
+    return {
+      culturalContext: "An error occurred while retrieving cultural context.",
+      keyPhrases: [],
+      pronunciation: "An error occurred while retrieving pronunciation guide."
+    };
   }
 }
 
