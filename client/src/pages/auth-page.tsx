@@ -33,7 +33,7 @@ export default function AuthPage() {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                   </svg>
                 </div>
-                <h2 className="text-3xl font-bold text-center">Welcome to Mzungumzo</h2>
+                <h2 className="text-3xl font-bold text-center">Welcome to TransLingual</h2>
                 <p className="text-center text-gray-600 dark:text-gray-300 max-w-md mx-auto">
                   Join our multilingual AI chat platform to explore and learn Kenyan languages including Maasai, Kiswahili, Kikuyu, and more.
                 </p>

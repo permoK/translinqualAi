@@ -39,7 +39,7 @@ export function Header() {
             </svg>
           </div>
           <Link href="/">
-            <span className="font-sans font-bold text-xl cursor-pointer">Mzungumzo</span>
+            <span className="font-sans font-bold text-xl cursor-pointer">TransLingual</span>
           </Link>
         </div>
         
