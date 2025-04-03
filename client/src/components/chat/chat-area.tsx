@@ -186,7 +186,7 @@ export function ChatArea({ onOpenSidebar }: ChatAreaProps) {
                   </svg>
                 </div>
               </div>
-              <h2 className="text-xl font-bold text-center mb-2">Welcome to TransLingual AI</h2>
+              <h2 className="text-xl font-bold text-center mb-2">Welcome to Translinqual AI</h2>
               <p className="text-center text-gray-600 dark:text-gray-300 mb-6">
                 I can help you translate and learn Maasai and other Kenyan languages. Try asking me something!
               </p>
