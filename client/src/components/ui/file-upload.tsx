@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { PaperclipIcon, X, File, FileText, FileImage, Upload } from "lucide-react";
 import { uploadFile } from "@/lib/api";
@@ -6,9 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface FileUploadProps {
   onUpload: (fileUrl: string, fileName: string) => void;
+  children?: ReactNode;
 }
 
-export function FileUpload({ onUpload }: FileUploadProps) {
+export function FileUpload({ onUpload, children }: FileUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<{ name: string, size: number, type: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +133,10 @@ export function FileUpload({ onUpload }: FileUploadProps) {
               <div className="bg-primary h-1.5 rounded-full animate-pulse w-full"></div>
             </div>
           )}
+        </div>
+      ) : children ? (
+        <div onClick={handleButtonClick} className="cursor-pointer">
+          {children}
         </div>
       ) : (
         <Button

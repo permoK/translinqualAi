@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { VoiceRecorder } from "@/components/ui/voice-recorder";
@@ -7,7 +7,10 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { sendMessage } from "@/lib/socket";
 import { startSpeechRecognition, speakText } from "@/lib/speech";
 import { useToast } from "@/hooks/use-toast";
-import { Bold, Italic, Link, Mic, Send } from "lucide-react";
+import { 
+  Bold, Italic, Link, Mic, Send, Image, FileText, 
+  Code, PencilLine, Maximize2, Minimize2, ChevronUp, ChevronDown 
+} from "lucide-react";
 
 interface ChatInputProps {
   conversationId: number;
@@ -20,11 +23,15 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
   const [isRecording, setIsRecording] = useState(false);
   const [showDrawingPad, setShowDrawingPad] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Track network status
-  useState(() => {
+  useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
@@ -35,10 +42,35 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  });
+  }, []);
+
+  // Focus textarea on mount
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, []);
+
+  // Handle clicking outside the input to close toolbar
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        inputContainerRef.current && 
+        !inputContainerRef.current.contains(event.target as Node) &&
+        isToolbarVisible
+      ) {
+        setIsToolbarVisible(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isToolbarVisible]);
 
   const handleSendMessage = () => {
-    if (!message.trim()) return;
+    if (!message.trim() || isSending) return;
     
     if (isOffline) {
       // Store message locally for later sending
@@ -50,20 +82,36 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
       return;
     }
 
-    sendMessage(conversationId, message, userId, language);
-    setMessage("");
+    setIsSending(true);
     
-    // Resize the textarea back to initial size
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    // Send with a slight animation delay to show the sending state
+    setTimeout(() => {
+      sendMessage(conversationId, message, userId, language);
+      setMessage("");
+      setIsSending(false);
+      
+      // Resize the textarea back to initial size
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      
+      // Reset expanded state
+      setIsExpanded(false);
+    }, 300);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Send message on Ctrl+Enter or Cmd+Enter
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    // Send message on Enter (without shift)
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+    
+    // New paragraph on Shift+Enter is allowed naturally
+    
+    // Expand on arrow up if at the start of input
+    if (e.key === 'ArrowUp' && textareaRef.current?.selectionStart === 0) {
+      setIsExpanded(true);
     }
   };
 
@@ -73,7 +121,20 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
     // Auto-resize textarea
     const textarea = e.target;
     textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
+    
+    // Set a max height before scrolling
+    const maxHeight = 200;
+    if (textarea.scrollHeight > maxHeight) {
+      textarea.style.height = `${maxHeight}px`;
+      setIsExpanded(true);
+    } else {
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+    
+    // Show toolbar when user starts typing
+    if (!isToolbarVisible && e.target.value) {
+      setIsToolbarVisible(true);
+    }
   };
 
   const handleStartVoiceRecording = () => {
@@ -110,7 +171,7 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
     setMessage(prevMessage => prevMessage ? `${prevMessage}\n${fileMessage}` : fileMessage);
   };
 
-  const formatText = (format: 'bold' | 'italic' | 'link') => {
+  const formatText = (format: 'bold' | 'italic' | 'link' | 'code') => {
     if (!textareaRef.current) return;
     
     const textarea = textareaRef.current;
@@ -134,6 +195,10 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
         replacement = `[${selected}](url)`;
         cursorPosition = end + 3;
         break;
+      case 'code':
+        replacement = `\`${selected}\``;
+        cursorPosition = start + 1;
+        break;
     }
     
     const newMessage = message.substring(0, start) + replacement + message.substring(end);
@@ -152,10 +217,18 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
     }, 0);
   };
 
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    
+    if (!isExpanded && textareaRef.current) {
+      setTimeout(() => {
+        textareaRef.current!.focus();
+      }, 0);
+    }
+  };
+
   return (
-    <div className="border-t dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-      {/* File Upload Preview */}
-      
+    <div className="border-t dark:border-gray-800 bg-white dark:bg-gray-900 p-3 md:p-4 transition-all duration-200">
       {/* Drawing Pad */}
       {showDrawingPad && (
         <DrawingPad 
@@ -175,96 +248,200 @@ export function ChatInput({ conversationId, userId, language }: ChatInputProps) 
       )}
       
       {/* Modern Input Box */}
-      <div className="flex items-end">
-        <div className="flex-1 border dark:border-gray-700 rounded-2xl shadow-sm bg-white dark:bg-gray-800 transition-all">
-          {/* Toolbar */}
-          <div className="flex items-center p-2 border-b dark:border-gray-700 rounded-t-2xl bg-gray-50 dark:bg-gray-800">
-            <div className="flex space-x-1">
+      <div 
+        ref={inputContainerRef}
+        className={`max-w-4xl mx-auto transition-all duration-300 ease-in-out ${isExpanded ? 'mb-6' : ''}`}
+      >
+        <div className="flex items-start md:items-end">
+          <div 
+            className={`relative flex-1 border dark:border-gray-700 rounded-2xl shadow-sm bg-white dark:bg-gray-800 transition-all duration-200 
+              ${isExpanded ? 'shadow-md' : ''}`}
+          >
+            {/* Expand/Collapse Button (only visible when expanded) */}
+            {isExpanded && (
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={() => formatText('bold')}
-                className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                size="sm"
+                onClick={toggleExpand}
+                className="absolute -top-8 right-2 h-7 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-                <Bold className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4 mr-1" />
+                <span>Collapse</span>
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => formatText('italic')}
-                className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            )}
+            
+            {/* Toolbar - only visible when expanded or actively showing */}
+            {(isExpanded || isToolbarVisible) && (
+              <div 
+                className={`flex items-center p-2 border-b dark:border-gray-700 rounded-t-2xl bg-gray-50 dark:bg-gray-800
+                  transition-opacity duration-200 ${isToolbarVisible ? 'opacity-100' : 'opacity-0'}`}
               >
-                <Italic className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => formatText('link')}
-                className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
-                <Link className="h-4 w-4" />
-              </Button>
+                <div className="flex space-x-1 overflow-x-auto scrollbar-none">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => formatText('bold')}
+                    className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Bold"
+                  >
+                    <Bold className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => formatText('italic')}
+                    className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Italic"
+                  >
+                    <Italic className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => formatText('code')}
+                    className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Inline Code"
+                  >
+                    <Code className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => formatText('link')}
+                    className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Link"
+                  >
+                    <Link className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="h-5 border-r dark:border-gray-700 mx-2 hidden md:block"></div>
+                
+                <div className="hidden md:flex space-x-1">
+                  {/* File Upload */}
+                  <FileUpload onUpload={handleFileUploaded}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                      title="Upload File"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </FileUpload>
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowDrawingPad(!showDrawingPad)}
+                    className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title="Drawing"
+                  >
+                    <PencilLine className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="ml-auto">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleExpand}
+                    className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    title={isExpanded ? "Minimize" : "Maximize"}
+                  >
+                    {isExpanded ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* Text Input */}
+            <div className="p-3">
+              <Textarea
+                ref={textareaRef}
+                placeholder="Message Translinqual AI..."
+                value={message}
+                onChange={handleTextareaChange}
+                onKeyDown={handleKeyDown}
+                onClick={() => !isToolbarVisible && setIsToolbarVisible(true)}
+                className={`w-full border-0 focus-visible:ring-0 resize-none bg-transparent outline-none 
+                  text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500
+                  transition-all duration-200 ${isExpanded ? 'min-h-[120px]' : ''}`}
+                rows={isExpanded ? 4 : 1}
+              />
+              
+              {/* Character count, subtle hint */}
+              {message.length > 0 && (
+                <div className="text-xs text-right text-gray-400 mt-1 mr-1 select-none">
+                  {message.length} {message.length === 1 ? 'character' : 'characters'}
+                </div>
+              )}
             </div>
             
-            <div className="h-5 border-r dark:border-gray-700 mx-2"></div>
-            
-            <div className="flex space-x-1">
-              {/* File Upload */}
-              <FileUpload onUpload={handleFileUploaded} />
+            {/* Bottom toolbar on mobile */}
+            <div className="md:hidden flex items-center justify-between p-2 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+              <div className="flex space-x-2">
+                <FileUpload onUpload={handleFileUploaded}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="p-1 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                </FileUpload>
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowDrawingPad(!showDrawingPad)}
+                  className="p-1 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <PencilLine className="h-4 w-4" />
+                </Button>
+              </div>
               
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowDrawingPad(!showDrawingPad)}
-                className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-                </svg>
-              </Button>
+              <div className="text-xs text-gray-500">
+                Press <kbd className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700">↵</kbd> to send
+              </div>
             </div>
           </div>
           
-          {/* Text Input */}
-          <div className="p-3">
-            <Textarea
-              ref={textareaRef}
-              placeholder="Type a message..."
-              value={message}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              className="w-full border-0 focus-visible:ring-0 resize-none bg-transparent outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-              rows={2}
-            />
-          </div>
-        </div>
-        
-        {/* Send Controls */}
-        <div className="flex gap-2 ml-2">
-          {!isRecording && (
+          {/* Send Controls */}
+          <div className="flex gap-2 ml-2">
+            {!isRecording && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleStartVoiceRecording}
+                className="flex items-center justify-center h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors duration-200"
+                title="Voice Input"
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+            )}
             <Button
-              variant="ghost"
               size="icon"
-              onClick={handleStartVoiceRecording}
-              className="flex items-center justify-center h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              onClick={handleSendMessage}
+              disabled={!message.trim() || isSending}
+              className={`flex items-center justify-center h-10 w-10 rounded-full text-white shadow-md hover:shadow-lg 
+                transition-all duration-200 ${isSending ? 'animate-pulse' : ''}
+                ${!message.trim() ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'}`}
+              title="Send Message"
             >
-              <Mic className="h-5 w-5" />
+              <Send className={`h-5 w-5 ${isSending ? 'opacity-50' : ''}`} />
             </Button>
-          )}
-          <Button
-            size="icon"
-            onClick={handleSendMessage}
-            disabled={!message.trim()}
-            className="flex items-center justify-center h-10 w-10 rounded-full bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:shadow-none"
-          >
-            <Send className="h-5 w-5" />
-          </Button>
+          </div>
         </div>
       </div>
       
       {/* Offline Mode Warning */}
       {isOffline && (
-        <div className="mt-3">
+        <div className="mt-3 max-w-4xl mx-auto">
           <div className="flex items-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800/60 text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-yellow-500 mr-2">
               <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>

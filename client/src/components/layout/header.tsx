@@ -152,56 +152,125 @@ export function Header() {
         </div>
       </div>
       
-      {/* Mobile Navigation Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-800">
-          <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link href="/">
+      {/* Mobile Navigation Menu with animation */}
+      <div 
+        className={`md:hidden border-t border-gray-200 dark:border-gray-800 overflow-hidden transition-all duration-300 ease-in-out ${
+          mobileMenuOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="px-2 pt-2 pb-3 space-y-1">
+          <Link href="/">
+            <a 
+              className={`block px-3 py-2 rounded-md font-medium transition-colors duration-200 ${
+                location === "/" 
+                  ? "text-primary bg-gray-100 dark:bg-gray-800" 
+                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                Home
+              </span>
+            </a>
+          </Link>
+          
+          <Link href="/chat">
+            <a 
+              className={`block px-3 py-2 rounded-md font-medium transition-colors duration-200 ${
+                location.startsWith("/chat") 
+                  ? "text-primary bg-gray-100 dark:bg-gray-800" 
+                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Conversations
+              </span>
+            </a>
+          </Link>
+          
+          <a 
+            href="#" 
+            className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+              Features
+            </span>
+          </a>
+          
+          <a 
+            href="#" 
+            className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+              About
+            </span>
+          </a>
+          
+          <a 
+            href="#" 
+            className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <path d="M12 17h.01"></path>
+              </svg>
+              Help
+            </span>
+          </a>
+          
+          {user?.role === "admin" && (
+            <Link href="/admin">
               <a 
-                className={`block px-3 py-2 rounded-md font-medium ${
-                  location === "/" 
-                    ? "text-primary bg-gray-100 dark:bg-gray-800" 
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
+                className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Home
+                <span className="flex items-center">
+                  <LayoutDashboard className="h-5 w-5 mr-2" />
+                  Admin Dashboard
+                </span>
               </a>
             </Link>
+          )}
+          
+          {user && (
             <a 
               href="#" 
-              className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded-md text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200 mt-2"
+              onClick={(e) => {
+                e.preventDefault();
+                handleLogout();
+                setMobileMenuOpen(false);
+              }}
             >
-              Features
+              <span className="flex items-center">
+                <LogOut className="h-5 w-5 mr-2" />
+                Log out
+              </span>
             </a>
-            <a 
-              href="#" 
-              className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              About
-            </a>
-            <a 
-              href="#" 
-              className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Help
-            </a>
-            {user?.role === "admin" && (
-              <Link href="/admin">
-                <a 
-                  className="block px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Admin Dashboard
-                </a>
-              </Link>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </header>
   );
 }

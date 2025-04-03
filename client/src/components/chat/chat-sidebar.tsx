@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getConversations, createConversation, deleteConversation } from "@/lib/api";
+import { getConversations, createConversation, deleteConversation, updateConversation } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Search, Plus, X, MoreVertical, Trash, Share, Edit, Download } from "lucide-react";
+import { Loader2, Search, Plus, X, MoreVertical, Trash, Share, Edit, Download, Sparkles } from "lucide-react";
 import { Conversation } from "@/types";
 import { LanguageSelector } from "@/components/ui/language-selector";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +30,9 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewChatDialogOpen, setIsNewChatDialogOpen] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState("");
+  const [editConversation, setEditConversation] = useState<Conversation | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState("mas"); // Default to Maasai
   const { toast } = useToast();
 
@@ -58,11 +60,58 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
     }
   });
 
+  const renameMutation = useMutation({
+    mutationFn: ({ id, title }: { id: number; title: string }) => 
+      updateConversation(id, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+      toast({
+        title: "Conversation renamed",
+        description: "Your conversation has been successfully renamed",
+      });
+      setIsRenameDialogOpen(false);
+      setEditConversation(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error renaming conversation",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleDeleteConversation = (e: React.MouseEvent, conversationId: number) => {
     e.preventDefault(); // Prevent navigation to conversation
     e.stopPropagation(); // Prevent event bubbling
     
     deleteMutation.mutate(conversationId);
+  };
+
+  const handleRenameConversation = (e: React.MouseEvent, conversation: Conversation) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setEditConversation(conversation);
+    setNewChatTitle(conversation.title);
+    setIsRenameDialogOpen(true);
+  };
+
+  const handleRenameSubmit = () => {
+    if (!editConversation) return;
+    if (!newChatTitle.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please provide a title for your conversation",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    renameMutation.mutate({ 
+      id: editConversation.id, 
+      title: newChatTitle
+    });
   };
 
   const handleShareConversation = (e: React.MouseEvent, conversationId: number) => {
@@ -286,6 +335,13 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem 
                         className="cursor-pointer flex items-center"
+                        onClick={(e) => handleRenameConversation(e, conversation)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        <span>Rename</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="cursor-pointer flex items-center"
                         onClick={(e) => handleShareConversation(e, conversation.id)}
                       >
                         <Share className="mr-2 h-4 w-4" />
@@ -357,6 +413,45 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
           </Dialog>
         </div>
       </aside>
+      
+      {/* Rename Dialog */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Conversation</DialogTitle>
+            <DialogDescription>
+              Change the title of your conversation below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="rename-title">New Title</Label>
+              <Input
+                id="rename-title"
+                placeholder="Enter a new title"
+                value={newChatTitle}
+                onChange={(e) => setNewChatTitle(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameSubmit} className="ml-2">
+              {renameMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>Save</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Backdrop for mobile */}
       {isOpen !== undefined && isOpen && (
